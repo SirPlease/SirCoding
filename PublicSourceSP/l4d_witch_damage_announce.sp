@@ -18,9 +18,14 @@
 * - Fixed Damage Prints either being over or under Witch's Health
 * - Only Show people that did damage to the Witch, the Witch is not something you need to gang up on.
 * 
-* Version 1.1
+* Version 1.0a
 * - Blocked SI Damage to Witch (Except for Tank) - This also fixes less than 1000 Damage/100 %
 * - Allows Console Witch Spawns. (Doesn't support Multiple Witches at the same time)
+* 
+* Version 1.1
+* - Added "Crown" Notifier on 1 ShotKill.
+* - Added "Tank-Kill" Notifier when Tank kills Witch.
+* - Added Cvar to enable or disable SI from causing the witch to get startled. (FF to Witch is always blocked)
 */
 
 new const TEAM_SURVIVOR = 2;
@@ -41,6 +46,9 @@ new Handle: g_hCvarWitchHealth       = INVALID_HANDLE;
 //Survivor Array - Store Survivors in here for Damage Print.
 new g_iSurvivorLimit = 4;   
 
+//Handles Cvars
+new Handle:cvar_allow_witch_scratch;
+
 public Plugin:myinfo = 
 {
 	name = "Witch Damage Announce",
@@ -52,6 +60,8 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
+	cvar_allow_witch_scratch=CreateConVar("witch_block_enrage", "0", "Disable SI from forcing the witch to Attack - 0 = Block FF, Allow Enrage");
+	
 	//In case Witch survives.
 	HookEvent("player_death", PlayerDied_Event, EventHookMode_Post);
 	HookEvent("round_start", RoundStart_Event, EventHookMode_PostNoCopy);
@@ -79,11 +89,15 @@ public OnEntityCreated(entity, const String:classname[])
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
 	//Check if Damage has to be dealt.
-	if (!inflictor || !attacker || !victim || !IsValidEdict(victim) || !IsValidEdict(inflictor) || GetClientTeam(attacker) != 3) return Plugin_Continue;
-	else if (GetEntProp(attacker, Prop_Send, "m_zombieClass") == 8) return Plugin_Continue;
-	else return Plugin_Handled;
+	if (!inflictor || !attacker || !victim || !IsValidEdict(victim) || !IsValidEdict(inflictor) || GetClientTeam(attacker) != 3 || IsTank(attacker)) return Plugin_Continue;
+	else if (!GetConVarBool(cvar_allow_witch_scratch))
+	{
+		damage = 0.0; 
+		return Plugin_Changed;
+	}
+	return Plugin_Handled;
 }
-		
+
 public WitchHurt_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	// Catch damage done to Witch
@@ -137,11 +151,27 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new killerId = GetEventInt(event, "userid");
 	new killer = GetClientOfUserId(killerId);
+	new bool:oneshot = GetEventBool(event, "oneshot")
+	
+	//Check if Tank Killed the Witch.
+	if (IsTank(killer))
+	{
+		PrintToChatAll("\x01>> \x04Tank (\x03%N) \x01killed the \x04Witch", killer);
+		ClearDamage();
+		return;
+	}
+	//Check if it was a cr0wn
+	if (oneshot)
+	{
+		PrintToChatAll("\x01>> \x03%N \x01Cr0wned the \x04Witch", killer);
+		ClearDamage();
+		return;
+	}
 	
 	//If Damage is lower than Max Health, Adjust.
-	if (DamageWitchTotal < g_fWitchHealth) iDamageWitch[killer] + (RoundToFloor(g_fWitchHealth - DamageWitchTotal));
+	if (DamageWitchTotal < g_fWitchHealth) iDamageWitch[killer] + (RoundToFloor(g_fWitchHealth - DamageWitchTotal));	
 	
-	if (!bRoundOver) 
+	if (!bRoundOver)
 	{	
 		bNeedsPrint = false;
 		bWitchSpawned = false;
@@ -271,22 +301,27 @@ stock bool:IsClientAndInGame(index)
 
 GetDamageAsPercent(damage)
 {
-        return RoundToFloor(FloatMul(FloatDiv(float(damage), g_fWitchHealth), 100.0));
+	return RoundToFloor(FloatMul(FloatDiv(float(damage), g_fWitchHealth), 100.0));
 }
      
 bool:IsExactPercent(damage)
 {
-        return (FloatAbs(float(GetDamageAsPercent(damage)) - FloatMul(FloatDiv(float(damage), g_fWitchHealth), 100.0)) < 0.001) ? true:false;
+	return (FloatAbs(float(GetDamageAsPercent(damage)) - FloatMul(FloatDiv(float(damage), g_fWitchHealth), 100.0)) < 0.001) ? true:false;
 }
-     
+
+stock bool:IsTank(client)
+{
+	return (IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") == 8);
+}
+
 public SortByDamageDesc(elem1, elem2, const array[], Handle:hndl)
 {
-        // By damage, then by client index, descending
-        if (iDamageWitch[elem1] > iDamageWitch[elem2]) return -1;
-        else if (iDamageWitch[elem2] > iDamageWitch[elem1]) return 1;
-        else if (elem1 > elem2) return -1;
-        else if (elem2 > elem1) return 1;
-        return 0;
+	// By damage, then by client index, descending
+	if (iDamageWitch[elem1] > iDamageWitch[elem2]) return -1;
+	else if (iDamageWitch[elem2] > iDamageWitch[elem1]) return 1;
+	else if (elem1 > elem2) return -1;
+	else if (elem2 > elem1) return 1;
+	return 0;
 }
 
 ClearDamage()
