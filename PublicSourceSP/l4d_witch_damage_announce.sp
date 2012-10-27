@@ -51,240 +51,240 @@ new Handle:cvar_allow_witch_scratch;
 
 public Plugin:myinfo = 
 {
-	name = "Witch Damage Announce",
-	author = "Sir",
-	description = "Print Witch Damage to chat",
-	version = "1.1",
-	url = "cake"
+    name = "Witch Damage Announce",
+    author = "Sir",
+    description = "Print Witch Damage to chat",
+    version = "1.1",
+    url = "cake"
 }
 
 public OnPluginStart()
 {
-	cvar_allow_witch_scratch=CreateConVar("witch_block_enrage", "0", "Disable SI from forcing the witch to Attack - 0 = Block FF, Allow Enrage");
-	
-	//In case Witch survives.
-	HookEvent("player_death", PlayerDied_Event, EventHookMode_Post);
-	HookEvent("round_start", RoundStart_Event, EventHookMode_PostNoCopy);
-	HookEvent("round_end", RoundEnd_Event, EventHookMode_PostNoCopy);
-	
-	//Get Witch's Health in case Config has a different health value.
-	g_hCvarWitchHealth = FindConVar("z_witch_health");
-	
-	//Damage Calculation & Death Print.
-	HookEvent("infected_hurt", WitchHurt_Event, EventHookMode_Post);
-	HookEvent("witch_killed", WitchDeath_Event, EventHookMode_Post);
+    cvar_allow_witch_scratch=CreateConVar("witch_block_enrage", "0", "Disable SI from forcing the witch to Attack - 0 = Block FF, Allow Enrage");
+    
+    //In case Witch survives.
+    HookEvent("player_death", PlayerDied_Event, EventHookMode_Post);
+    HookEvent("round_start", RoundStart_Event, EventHookMode_PostNoCopy);
+    HookEvent("round_end", RoundEnd_Event, EventHookMode_PostNoCopy);
+    
+    //Get Witch's Health in case Config has a different health value.
+    g_hCvarWitchHealth = FindConVar("z_witch_health");
+    
+    //Damage Calculation & Death Print.
+    HookEvent("infected_hurt", WitchHurt_Event, EventHookMode_Post);
+    HookEvent("witch_killed", WitchDeath_Event, EventHookMode_Post);
 }
 
 public OnEntityCreated(entity, const String:classname[])
 {
-	if (StrEqual(classname, CLASSNAME_WITCH, false))
-	{
-		//Hook Witch & Get Health
-		SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage);
-		bWitchSpawned = true;
-		g_fWitchHealth = GetConVarFloat(g_hCvarWitchHealth);
-	}
+    if (StrEqual(classname, CLASSNAME_WITCH, false))
+    {
+        //Hook Witch & Get Health
+        SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage);
+        bWitchSpawned = true;
+        g_fWitchHealth = GetConVarFloat(g_hCvarWitchHealth);
+    }
 }
 
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
-	//Check if Damage has to be dealt.
-	if (!inflictor || !attacker || !victim || !IsValidEdict(victim) || !IsValidEdict(inflictor) || GetClientTeam(attacker) != 3 || IsTank(attacker)) return Plugin_Continue;
-	else if (!GetConVarBool(cvar_allow_witch_scratch))
-	{
-		damage = 0.0; 
-		return Plugin_Changed;
-	}
-	return Plugin_Handled;
+    //Check if Damage has to be dealt.
+    if (!inflictor || !attacker || !victim || !IsValidEdict(victim) || !IsValidEdict(inflictor) || GetClientTeam(attacker) != 3 || IsTank(attacker)) return Plugin_Continue;
+    else if (!GetConVarBool(cvar_allow_witch_scratch))
+    {
+        damage = 0.0; 
+        return Plugin_Changed;
+    }
+    return Plugin_Handled;
 }
 
 public WitchHurt_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	// Catch damage done to Witch
-	new victimEntId = GetEventInt(event, "entityid");
-
-	if (IsWitch(victimEntId))
-	{
-		new attackerId = GetEventInt(event, "attacker");
-		new attacker = GetClientOfUserId(attackerId);
-		new damageDone = GetEventInt(event, "amount");
-		
-		// Just count Survivor Damage
-		if (IsClientAndInGame(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR)
-		{
-			DamageWitchTotal += damageDone;
-			
-			//If Damage is higher than Max Health, Adjust.
-			if (DamageWitchTotal > g_fWitchHealth) iDamageWitch[attacker] += (damageDone - (DamageWitchTotal - RoundToFloor(g_fWitchHealth)));
-			else iDamageWitch[attacker] += damageDone;
-		}
-	}
+    // Catch damage done to Witch
+    new victimEntId = GetEventInt(event, "entityid");
+    
+    if (IsWitch(victimEntId))
+    {
+        new attackerId = GetEventInt(event, "attacker");
+        new attacker = GetClientOfUserId(attackerId);
+        new damageDone = GetEventInt(event, "amount");
+        
+        // Just count Survivor Damage
+        if (IsClientAndInGame(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR)
+        {
+            DamageWitchTotal += damageDone;
+            
+            //If Damage is higher than Max Health, Adjust.
+            if (DamageWitchTotal > g_fWitchHealth) iDamageWitch[attacker] += (damageDone - (DamageWitchTotal - RoundToFloor(g_fWitchHealth)));
+            else iDamageWitch[attacker] += damageDone;
+        }
+    }
 }
 
 public RoundStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	// Clear Witch Damage
-	ClearDamage();
-	
-	//Fresh Start
-	bRoundOver = false;
-	bWitchSpawned = false;
-	bNeedsPrint = true;
-	
+    // Clear Witch Damage
+    ClearDamage();
+    
+    //Fresh Start
+    bRoundOver = false;
+    bWitchSpawned = false;
+    bNeedsPrint = true;
+    
 }
-	
+
 public RoundEnd_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	//Prevent Double Print
-	if (bWitchSpawned)
-	{
-		//Prevent Double Print
-		bNeedsPrint = false;
-		bRoundOver = true;
-		CalculateWitch();
-		//Round End gets called Twice, prevent random print.
-		bWitchSpawned = false;
-	}
+    //Prevent Double Print
+    if (bWitchSpawned)
+    {
+        //Prevent Double Print
+        bNeedsPrint = false;
+        bRoundOver = true;
+        CalculateWitch();
+        //Round End gets called Twice, prevent random print.
+        bWitchSpawned = false;
+    }
 }
-	
+
 public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	new killerId = GetEventInt(event, "userid");
-	new killer = GetClientOfUserId(killerId);
-	new bool:oneshot = GetEventBool(event, "oneshot")
-	
-	//Check if Tank Killed the Witch.
-	if (IsTank(killer))
-	{
-		PrintToChatAll("\x01>> \x04Tank (\x03%N) \x01killed the \x04Witch", killer);
-		bNeedsPrint = false;
-		bWitchSpawned = false;
-		ClearDamage();
-		return;
-	}
-	//Check if it was a cr0wn
-	if (oneshot)
-	{
-		PrintToChatAll("\x01>> \x03%N \x01Cr0wned the \x04Witch", killer);
-		bNeedsPrint = false;
-		bWitchSpawned = false;
-		ClearDamage();
-		return;
-	}
-	
-	//If Damage is lower than Max Health, Adjust.
-	if (DamageWitchTotal < g_fWitchHealth) iDamageWitch[killer] + (RoundToFloor(g_fWitchHealth - DamageWitchTotal));	
-	
-	if (!bRoundOver)
-	{	
-		bNeedsPrint = false;
-		bWitchSpawned = false;
-		CalculateWitch();
-		ClearDamage();
-	}
+    new killerId = GetEventInt(event, "userid");
+    new killer = GetClientOfUserId(killerId);
+    new bool:oneshot = GetEventBool(event, "oneshot")
+    
+    //Check if Tank Killed the Witch.
+    if (IsTank(killer))
+    {
+        PrintToChatAll("\x01>> \x04Tank (\x03%N) \x01killed the \x04Witch", killer);
+        bNeedsPrint = false;
+        bWitchSpawned = false;
+        ClearDamage();
+        return;
+    }
+    //Check if it was a cr0wn
+    if (oneshot)
+    {
+        PrintToChatAll("\x01>> \x03%N \x01Cr0wned the \x04Witch", killer);
+        bNeedsPrint = false;
+        bWitchSpawned = false;
+        ClearDamage();
+        return;
+    }
+    
+    //If Damage is lower than Max Health, Adjust.
+    if (DamageWitchTotal < g_fWitchHealth) iDamageWitch[killer] + (RoundToFloor(g_fWitchHealth - DamageWitchTotal));	
+    
+    if (!bRoundOver)
+    {	
+        bNeedsPrint = false;
+        bWitchSpawned = false;
+        CalculateWitch();
+        ClearDamage();
+    }
 }
 
 public PlayerDied_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	new userId = GetEventInt(event, "userid");
-	new victim = GetClientOfUserId(userId);
-	new attacker = GetEventInt(event, "attackerentid");
-	
-	if (IsClientAndInGame(victim) && GetClientTeam(victim) == TEAM_SURVIVOR && IsWitch(attacker))
-	{
-		//Delayed Timer in case Witch gets killed while she's running off.
-		CreateTimer(3.0, PrintAnyway)
-	}
+    new userId = GetEventInt(event, "userid");
+    new victim = GetClientOfUserId(userId);
+    new attacker = GetEventInt(event, "attackerentid");
+    
+    if (IsClientAndInGame(victim) && GetClientTeam(victim) == TEAM_SURVIVOR && IsWitch(attacker))
+    {
+        //Delayed Timer in case Witch gets killed while she's running off.
+        CreateTimer(3.0, PrintAnyway)
+    }
 }
 
 public Action:PrintAnyway(Handle:timer)
 {
-	if (bNeedsPrint)
-	{
-		//Prevent extra calculating/prints
-		bWitchSpawned = false;
-		CalculateWitch();
-	}
+    if (bNeedsPrint)
+    {
+        //Prevent extra calculating/prints
+        bWitchSpawned = false;
+        CalculateWitch();
+    }
 }
-		
+
 CalculateWitch()
 {
-	if (!bNeedsPrint)
-	{
-		if (!bRoundOver) PrintWitchDamage();
-		else
-		{
-			PrintWitchRemainingHealth();
-			PrintWitchDamage();
-		}
-	}
-	else
-	{
-		PrintWitchRemainingHealth();
-		PrintWitchDamage();
-	}
+    if (!bNeedsPrint)
+    {
+        if (!bRoundOver) PrintWitchDamage();
+        else
+        {
+            PrintWitchRemainingHealth();
+            PrintWitchDamage();
+        }
+    }
+    else
+    {
+        PrintWitchRemainingHealth();
+        PrintWitchDamage();
+    }
 }
 
 PrintWitchRemainingHealth()
 {
-	PrintToChatAll("\x01[SM] (\x03Witch\x01) had \x04%d \x01health remaining", RoundToFloor(g_fWitchHealth) - DamageWitchTotal);
+    PrintToChatAll("\x01[SM] (\x03Witch\x01) had \x04%d \x01health remaining", RoundToFloor(g_fWitchHealth) - DamageWitchTotal);
 }
 
 PrintWitchDamage()
 {
-	if (!bRoundOver || bNeedsPrint)
-	{
-		PrintToChatAll("\x01[SM] Damage dealt to (\x03Witch\x01):");
-	}
-	
-	new client;
-	new percent_total; // Accumulated total of calculated percents, for fudging out numbers at the end
-	new damage_total; // Accumulated total damage dealt by survivors, to see if we need to fudge upwards to 100%
-	new survivor_index = -1;
-	new survivor_clients[g_iSurvivorLimit]; // Array to store survivor client indexes in, for the display iteration
-	decl percent_damage, damage;
-	
-	for (client = 1; client <= MaxClients; client++)
-	{
-		if (!IsClientInGame(client) || GetClientTeam(client) != TEAM_SURVIVOR || iDamageWitch[client] == 0)  continue;
-		survivor_index++;
-		survivor_clients[survivor_index] = client;
-		damage = iDamageWitch[client];
-		damage_total += damage;
-		percent_damage = GetDamageAsPercent(damage);
-		percent_total += percent_damage;
-	}
-	SortCustom1D(survivor_clients, g_iSurvivorLimit, SortByDamageDesc);
-     
-	new percent_adjustment;
-	// Percents add up to less than 100% AND > 99.5% damage was dealt to witch
-	if ((percent_total < 100 && float(damage_total) > (g_fWitchHealth - (g_fWitchHealth / 200.0))))
-	{
-		percent_adjustment = 100 - percent_total;
-	}
-     
-	new last_percent = 100; // Used to store the last percent in iteration to make sure an adjusted percent doesn't exceed the previous percent
-	decl adjusted_percent_damage;
-	for (new k; k <= survivor_index; k++)
-	{
-		client = survivor_clients[k];
-		damage = iDamageWitch[client];
-		percent_damage = GetDamageAsPercent(damage);
-		// Attempt to adjust the top damager's percent, defer adjustment to next player if it's an exact percent
-		if (percent_adjustment != 0 && // Is there percent to adjust
-				damage > 0 &&  // Is damage dealt > 0%
-						!IsExactPercent(damage) // Percent representation is not exact.
-						)
-		{
-			adjusted_percent_damage = percent_damage + percent_adjustment;
-			if (adjusted_percent_damage <= last_percent) // Make sure adjusted percent is not higher than previous percent, order must be maintained
-			{
-				percent_damage = adjusted_percent_damage;
-				percent_adjustment = 0;
-			}
-		}
-		PrintToChatAll("\x03%N\x01: %4d \x01[\x04%d%%\x01]", client, damage, percent_damage);
-	}
+    if (!bRoundOver || bNeedsPrint)
+    {
+        PrintToChatAll("\x01[SM] Damage dealt to (\x03Witch\x01):");
+    }
+    
+    new client;
+    new percent_total; // Accumulated total of calculated percents, for fudging out numbers at the end
+    new damage_total; // Accumulated total damage dealt by survivors, to see if we need to fudge upwards to 100%
+    new survivor_index = -1;
+    new survivor_clients[g_iSurvivorLimit]; // Array to store survivor client indexes in, for the display iteration
+    decl percent_damage, damage;
+    
+    for (client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientInGame(client) || GetClientTeam(client) != TEAM_SURVIVOR || iDamageWitch[client] == 0)  continue;
+        survivor_index++;
+        survivor_clients[survivor_index] = client;
+        damage = iDamageWitch[client];
+        damage_total += damage;
+        percent_damage = GetDamageAsPercent(damage);
+        percent_total += percent_damage;
+    }
+    SortCustom1D(survivor_clients, g_iSurvivorLimit, SortByDamageDesc);
+    
+    new percent_adjustment;
+    // Percents add up to less than 100% AND > 99.5% damage was dealt to witch
+    if ((percent_total < 100 && float(damage_total) > (g_fWitchHealth - (g_fWitchHealth / 200.0))))
+    {
+        percent_adjustment = 100 - percent_total;
+    }
+    
+    new last_percent = 100; // Used to store the last percent in iteration to make sure an adjusted percent doesn't exceed the previous percent
+    decl adjusted_percent_damage;
+    for (new k; k <= survivor_index; k++)
+    {
+        client = survivor_clients[k];
+        damage = iDamageWitch[client];
+        percent_damage = GetDamageAsPercent(damage);
+        // Attempt to adjust the top damager's percent, defer adjustment to next player if it's an exact percent
+        if (percent_adjustment != 0 && // Is there percent to adjust
+        damage > 0 &&  // Is damage dealt > 0%
+        !IsExactPercent(damage) // Percent representation is not exact.
+        )
+        {
+            adjusted_percent_damage = percent_damage + percent_adjustment;
+            if (adjusted_percent_damage <= last_percent) // Make sure adjusted percent is not higher than previous percent, order must be maintained
+            {
+                percent_damage = adjusted_percent_damage;
+                percent_adjustment = 0;
+            }
+        }
+        PrintToChatAll("\x03%N\x01: %4d \x01[\x04%d%%\x01]", client, damage, percent_damage);
+    }
 }
 
 stock bool:IsWitch(iEntity)
@@ -305,32 +305,31 @@ stock bool:IsClientAndInGame(index)
 
 GetDamageAsPercent(damage)
 {
-	return RoundToFloor(FloatMul(FloatDiv(float(damage), g_fWitchHealth), 100.0));
+    return RoundToFloor(FloatMul(FloatDiv(float(damage), g_fWitchHealth), 100.0));
 }
-     
+
 bool:IsExactPercent(damage)
 {
-	return (FloatAbs(float(GetDamageAsPercent(damage)) - FloatMul(FloatDiv(float(damage), g_fWitchHealth), 100.0)) < 0.001) ? true:false;
+    return (FloatAbs(float(GetDamageAsPercent(damage)) - FloatMul(FloatDiv(float(damage), g_fWitchHealth), 100.0)) < 0.001) ? true:false;
 }
 
 stock bool:IsTank(client)
 {
-	return (IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") == 8);
+    return (IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") == 8);
 }
 
 public SortByDamageDesc(elem1, elem2, const array[], Handle:hndl)
 {
-	// By damage, then by client index, descending
-	if (iDamageWitch[elem1] > iDamageWitch[elem2]) return -1;
-	else if (iDamageWitch[elem2] > iDamageWitch[elem1]) return 1;
-	else if (elem1 > elem2) return -1;
-	else if (elem2 > elem1) return 1;
-	return 0;
+    // By damage, then by client index, descending
+    if (iDamageWitch[elem1] > iDamageWitch[elem2]) return -1;
+    else if (iDamageWitch[elem2] > iDamageWitch[elem1]) return 1;
+    else if (elem1 > elem2) return -1;
+    else if (elem2 > elem1) return 1;
+    return 0;
 }
 
 ClearDamage()
 {
-	new i, maxplayers = MaxClients;
-	for (i = 1; i <= maxplayers; i++) iDamageWitch[i] = 0;
-	DamageWitchTotal = 0;
-}
+    new i, maxplayers = MaxClients;
+    for (i = 1; i <= maxplayers; i++) iDamageWitch[i] = 0;
+    DamageWitchTotal = 0;
