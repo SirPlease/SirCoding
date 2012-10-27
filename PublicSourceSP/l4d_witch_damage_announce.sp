@@ -157,6 +157,8 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
 	if (IsTank(killer))
 	{
 		PrintToChatAll("\x01>> \x04Tank (\x03%N) \x01killed the \x04Witch", killer);
+		bNeedsPrint = false;
+		bWitchSpawned = false;
 		ClearDamage();
 		return;
 	}
