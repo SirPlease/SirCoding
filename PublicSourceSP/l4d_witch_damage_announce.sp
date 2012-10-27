@@ -164,6 +164,8 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
 	if (oneshot)
 	{
 		PrintToChatAll("\x01>> \x03%N \x01Cr0wned the \x04Witch", killer);
+		bNeedsPrint = false;
+		bWitchSpawned = false;
 		ClearDamage();
 		return;
 	}
