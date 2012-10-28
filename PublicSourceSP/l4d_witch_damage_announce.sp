@@ -333,3 +333,4 @@ ClearDamage()
     new i, maxplayers = MaxClients;
     for (i = 1; i <= maxplayers; i++) iDamageWitch[i] = 0;
     DamageWitchTotal = 0;
+}

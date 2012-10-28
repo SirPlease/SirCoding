@@ -349,4 +349,4 @@ public SortByDamageDesc(elem1, elem2, const array[], Handle:hndl)
     else if (elem1 > elem2) return -1;
     else if (elem2 > elem1) return 1;
     return 0;
-    
+}

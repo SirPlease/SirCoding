@@ -38,5 +38,3 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
     else if (GetEntProp(attacker, Prop_Send, "m_zombieClass") == 8) return Plugin_Continue;
     return Plugin_Handled;
 }
-    
-    
