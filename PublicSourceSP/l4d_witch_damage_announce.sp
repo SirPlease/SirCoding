@@ -28,18 +28,24 @@
 * - Added Cvar to enable or disable SI from causing the witch to get startled. (FF to Witch is always blocked)
 * 
 * Version 1.1b
-* - Fixed Cr0wns not always counting as Cr0wns, resulting into a 1000 Damage/100% Print
+* - Fixed Cr0wns not always counting as Cr0wns, resulting into a 1000 Damage/100% Print.
+* - Added Fail Cr0wn Notifier. (Only shows when the killer got incapped & did 1000 DMG)
+* - Last Fix for Damage/Percentages; not adding up to 1000/100%.
+* - Changed print format a bit.
 */
 
 new const TEAM_SURVIVOR = 2;
 static const String:CLASSNAME_WITCH[]  	= "witch";
+static const String:WEAPON_SHOTGUN1[]    = "weapon_shotgun_chrome";
+static const String:WEAPON_SHOTGUN2[]    = "weapon_pumpshotgun";
+//static const String:WEAPON_MELEE[] = "weapon_melee";
 
 new bool: bRoundOver;                //Did Round End?
 new bool: bWitchSpawned;             //Did Witch Spawn?
-new bool: bNeedsPrint;               //Need Private Print?
-new iDamageWitch[MAXPLAYERS + 1];    //Damage done to Witch
-new DamageWitchTotal;                //Total Damage done to Witch - If Not killed.
-
+new bool: bHasPrinted;               //Did we Print?
+new iDamageWitch[MAXPLAYERS + 1];    //Damage done to Witch, client tracking.
+new DamageWitchTotal;                //Total Damage done to Witch.
+//new ShotWitchTotal;                  //Shots Fired at Witch.
 //Witch's Standard health
 new Float: g_fWitchHealth            = 1000.0;    
 
@@ -85,6 +91,7 @@ public OnEntityCreated(entity, const String:classname[])
         //Hook Witch & Get Health
         SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage);
         bWitchSpawned = true;
+        bHasPrinted = false;
         g_fWitchHealth = GetConVarFloat(g_hCvarWitchHealth);
     }
 }
@@ -111,15 +118,19 @@ public WitchHurt_Event(Handle:event, const String:name[], bool:dontBroadcast)
         new attackerId = GetEventInt(event, "attacker");
         new attacker = GetClientOfUserId(attackerId);
         new damageDone = GetEventInt(event, "amount");
+        decl String:Weapon[64];
+        new WeaponIndex = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
+        GetEdictClassname(WeaponIndex, Weapon, sizeof(Weapon));
         
         // Just count Survivor Damage
         if (IsClientAndInGame(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR)
         {
             DamageWitchTotal += damageDone;
+            //ShotWitchTotal++;
             
             //If Damage is higher than Max Health, Adjust.
             if (DamageWitchTotal > g_fWitchHealth) iDamageWitch[attacker] += (damageDone - (DamageWitchTotal - RoundToFloor(g_fWitchHealth)));
-            else iDamageWitch[attacker] += damageDone;
+            else iDamageWitch[attacker] += damageDone;	
         }
     }
 }
@@ -132,19 +143,15 @@ public RoundStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
     //Fresh Start
     bRoundOver = false;
     bWitchSpawned = false;
-    bNeedsPrint = true;
+    bHasPrinted = false;
 }
 
 public RoundEnd_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
-    //Prevent Double Print
     if (bWitchSpawned)
     {
-        //Prevent Double Print
-        bNeedsPrint = false;
         bRoundOver = true;
         CalculateWitch();
-        //Round End gets called Twice, prevent random print.
         bWitchSpawned = false;
     }
 }
@@ -158,29 +165,53 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
     if (IsTank(killer))
     {
         PrintToChatAll("\x01>> \x04Tank (\x03%N) \x01killed the \x04Witch", killer);
-        bNeedsPrint = false;
         bWitchSpawned = false;
         ClearDamage();
         return;
     }
     
     //If Damage is lower than Max Health, Adjust.
-    if (DamageWitchTotal < g_fWitchHealth) iDamageWitch[killer] + (RoundToFloor(g_fWitchHealth - DamageWitchTotal));
+    if (DamageWitchTotal < g_fWitchHealth)
+    {
+        iDamageWitch[killer] += (RoundToFloor(g_fWitchHealth - DamageWitchTotal));
+        DamageWitchTotal = RoundToFloor(g_fWitchHealth);
+    }
     
     //Check if it was a cr0wn
-	//Using Event Bool (OneShot) doesn't trigger when SI scratches Witch.
+    //Using Event Bool (OneShot) doesn't trigger when SI scratches Witch.
     if (iDamageWitch[killer] == 1000)
     {
-        PrintToChatAll("\x01>> \x03%N \x01Cr0wned the \x04Witch", killer);
-        bNeedsPrint = false;
+        if(bHasPrinted) return;
+        
         bWitchSpawned = false;
         ClearDamage();
+        
+        new String:WeaponName[64];
+        new WeaponIndex = GetEntPropEnt(killer, Prop_Send, "m_hActiveWeapon");
+        GetEdictClassname(WeaponIndex, WeaponName, sizeof(WeaponName));
+        
+        if(IsIncapped(killer) && !bRoundOver)
+        {
+            bHasPrinted = true;
+            PrintToChatAll("\x01>> \x03%N \x04failed Cr0wn \x01<<", killer);
+            PrintToChatAll("\x011000 [\x04100%%\x01] \x03%N", killer);
+            ClearDamage();
+            return;
+        }
+        
+        if (StrEqual(WeaponName, WEAPON_SHOTGUN1, false) || StrEqual(WeaponName, WEAPON_SHOTGUN2, false))
+        {
+            // Broken - Fix Later
+            //if(RoundToFloor(ShotWitchTotal) > 1) PrintToChatAll("\x01>> \x03%N \x01Draw Cr0wned the \x04Witch \x01<<", killer);
+            PrintToChatAll("\x01>> \x03%N \x01Cr0wned the \x04Witch", killer);
+        }
+        else PrintToChatAll("\x01>> \x03%N \x01Killed the \x03Witch \x04without a Shotgun \x01<<", killer);
+        bHasPrinted = true;
         return;
     }
     
     if (!bRoundOver)
     {	
-        bNeedsPrint = false;
         bWitchSpawned = false;
         CalculateWitch();
         ClearDamage();
@@ -202,42 +233,33 @@ public PlayerDied_Event(Handle:event, const String:name[], bool:dontBroadcast)
 
 public Action:PrintAnyway(Handle:timer)
 {
-    if (bNeedsPrint)
-    {
-        //Prevent extra calculating/prints
-        bWitchSpawned = false;
-        CalculateWitch();
-    }
+    
+    CalculateWitch();
 }
 
 CalculateWitch()
 {
-    if (!bNeedsPrint)
-    {
-        if (!bRoundOver) PrintWitchDamage();
-        else
-        {
-            PrintWitchRemainingHealth();
-            PrintWitchDamage();
-        }
-    }
+    if (bHasPrinted) return;
+    
+    if (!bRoundOver && !bWitchSpawned) PrintWitchDamage();
     else
     {
         PrintWitchRemainingHealth();
         PrintWitchDamage();
     }
+    bHasPrinted = true;
 }
 
 PrintWitchRemainingHealth()
 {
-    PrintToChatAll("\x01[SM] (\x03Witch\x01) had \x04%d \x01health remaining", RoundToFloor(g_fWitchHealth) - DamageWitchTotal);
+    PrintToChatAll("\x01(\x03Witch\x01) had \x04%d \x01health remaining", RoundToFloor(g_fWitchHealth) - DamageWitchTotal);
 }
 
 PrintWitchDamage()
 {
-    if (!bRoundOver || bNeedsPrint)
+    if (!bWitchSpawned)
     {
-        PrintToChatAll("\x01[SM] Damage dealt to (\x03Witch\x01):");
+        PrintToChatAll("\x04Damage \x01dealt to (\x03Witch\x01):");
     }
     
     new client;
@@ -286,7 +308,7 @@ PrintWitchDamage()
                 percent_adjustment = 0;
             }
         }
-        PrintToChatAll("\x03%N\x01: %4d \x01[\x04%d%%\x01]", client, damage, percent_damage);
+        PrintToChatAll("\x01%d [\x04%i%%\x01] \x03%N", damage, percent_damage, client);
     }
 }
 
@@ -318,7 +340,14 @@ bool:IsExactPercent(damage)
 
 stock bool:IsTank(client)
 {
-    return (IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") == 8);
+    if (GetEntProp(client, Prop_Send, "m_zombieClass") == 8) return true;
+    return false;
+}
+
+stock bool:IsIncapped(client)
+{
+    if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1)) return true;
+    return false;
 }
 
 public SortByDamageDesc(elem1, elem2, const array[], Handle:hndl)
@@ -335,6 +364,7 @@ ClearDamage()
 {
     new i, maxplayers = MaxClients;
     for (i = 1; i <= maxplayers; i++) iDamageWitch[i] = 0;
+    //ShotWitchTotal = 0;
     DamageWitchTotal = 0;
 }
 

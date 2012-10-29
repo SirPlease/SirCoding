@@ -228,11 +228,11 @@ PrintTankDamage()
             {
                 decl String:name[MAX_NAME_LENGTH];
                 GetClientName(i, name, sizeof(name));
-                PrintToChatAll("\x01[SM] Damage dealt to Tank (\x03%s\x01):", name);
+                PrintToChatAll("\x04Damage \x01dealt to Tank (\x03%N\x01):", name);
                 g_iWasTank[i] = 0;
             }
             else if(g_iWasTankAI > 0) 
-                PrintToChatAll("\x01[SM] Damage dealt to Tank (\x03AI\x01):");
+                PrintToChatAll("\x04Damage \x01dealt to Tank (\x03AI\x01):");
             g_iWasTankAI = 0;
         }
     }
@@ -283,7 +283,7 @@ PrintTankDamage()
                 percent_adjustment = 0;
             }
         }
-        PrintToChatAll("\x03%N\x01: %4d \x01[\x04%d%%\x01]", client, damage, percent_damage);
+        PrintToChatAll("\x01%d [\x04%i%%\x01] \x03%N", damage, percent_damage, client);
     }
 }
 
@@ -350,3 +350,6 @@ public SortByDamageDesc(elem1, elem2, const array[], Handle:hndl)
     else if (elem2 > elem1) return 1;
     return 0;
 }
+	
+	
+   
