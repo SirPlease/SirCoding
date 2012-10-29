@@ -228,7 +228,7 @@ PrintTankDamage()
             {
                 decl String:name[MAX_NAME_LENGTH];
                 GetClientName(i, name, sizeof(name));
-                PrintToChatAll("\x04Damage \x01dealt to Tank (\x03%N\x01):", name);
+                PrintToChatAll("\x04Damage \x01dealt to Tank (\x03%s\x01):", name);
                 g_iWasTank[i] = 0;
             }
             else if(g_iWasTankAI > 0) 
@@ -350,6 +350,3 @@ public SortByDamageDesc(elem1, elem2, const array[], Handle:hndl)
     else if (elem2 > elem1) return 1;
     return 0;
 }
-	
-	
-   
