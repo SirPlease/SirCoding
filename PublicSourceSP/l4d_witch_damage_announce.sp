@@ -26,6 +26,9 @@
 * - Added "Crown" Notifier on 1 ShotKill.
 * - Added "Tank-Kill" Notifier when Tank kills Witch.
 * - Added Cvar to enable or disable SI from causing the witch to get startled. (FF to Witch is always blocked)
+* 
+* Version 1.1b
+* - Fixed Cr0wns not always counting as Cr0wns, resulting into a 1000 Damage/100% Print
 */
 
 new const TEAM_SURVIVOR = 2;
@@ -54,8 +57,8 @@ public Plugin:myinfo =
     name = "Witch Damage Announce",
     author = "Sir",
     description = "Print Witch Damage to chat",
-    version = "1.1",
-    url = "cake"
+    version = "1.1b",
+    url = "https://github.com/SirPlease/SirCoding"
 }
 
 public OnPluginStart()
@@ -130,7 +133,6 @@ public RoundStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
     bRoundOver = false;
     bWitchSpawned = false;
     bNeedsPrint = true;
-    
 }
 
 public RoundEnd_Event(Handle:event, const String:name[], bool:dontBroadcast)
@@ -151,7 +153,6 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
     new killerId = GetEventInt(event, "userid");
     new killer = GetClientOfUserId(killerId);
-    new bool:oneshot = GetEventBool(event, "oneshot")
     
     //Check if Tank Killed the Witch.
     if (IsTank(killer))
@@ -162,8 +163,13 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
         ClearDamage();
         return;
     }
+    
+    //If Damage is lower than Max Health, Adjust.
+    if (DamageWitchTotal < g_fWitchHealth) iDamageWitch[killer] + (RoundToFloor(g_fWitchHealth - DamageWitchTotal));
+    
     //Check if it was a cr0wn
-    if (oneshot)
+	//Using Event Bool (OneShot) doesn't trigger when SI scratches Witch.
+    if (iDamageWitch[killer] == 1000)
     {
         PrintToChatAll("\x01>> \x03%N \x01Cr0wned the \x04Witch", killer);
         bNeedsPrint = false;
@@ -171,9 +177,6 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
         ClearDamage();
         return;
     }
-    
-    //If Damage is lower than Max Health, Adjust.
-    if (DamageWitchTotal < g_fWitchHealth) iDamageWitch[killer] + (RoundToFloor(g_fWitchHealth - DamageWitchTotal));	
     
     if (!bRoundOver)
     {	
@@ -334,3 +337,5 @@ ClearDamage()
     for (i = 1; i <= maxplayers; i++) iDamageWitch[i] = 0;
     DamageWitchTotal = 0;
 }
+
+
