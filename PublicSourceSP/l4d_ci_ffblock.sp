@@ -47,16 +47,29 @@ public OnEntityCreated(entity, const String:classname[])
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
     //Check if Damage has to be corrected - Intensively tested on both 30, 60 and 100 Tick. Server performance does not decrease.
-    if (!inflictor || !attacker || !victim || !IsValidEdict(victim) || !IsValidEdict(inflictor) || GetClientTeam(attacker) != 3 || IsTank(attacker)) return Plugin_Continue;
-    else if(GetConVarInt(g_hCvarDamage) > 0)
+    if (!IsValidClient(attacker)) return Plugin_Continue;
+    
+    if (GetClientTeam(attacker) == 3 && !IsTank(attacker))
     {
-        damage = float(GetConVarInt(g_hCvarCommonHealth) / GetConVarInt(g_hCvarDamage));
-        return Plugin_Changed;
+        if (GetConVarInt(g_hCvarDamage) > 0)
+        {
+            damage = float(GetConVarInt(g_hCvarCommonHealth) / GetConVarInt(g_hCvarDamage));
+            return Plugin_Changed;
+        }
+        return Plugin_Handled;		
     }
-    return Plugin_Handled;
+    return Plugin_Continue;
 }
 
 stock bool:IsTank(client)
 {
     return (IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") == 8);
+}
+
+bool:IsValidClient(client)
+{
+    if (client <= 0 || client > MaxClients) return false;
+    if (!IsClientInGame(client)) return false;
+    if (IsClientSourceTV(client) || IsClientReplay(client)) return false;
+    return true;
 }

@@ -99,13 +99,18 @@ public OnEntityCreated(entity, const String:classname[])
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
     //Check if Damage has to be dealt.
-    if (!inflictor || !attacker || !victim || !IsValidEdict(victim) || !IsValidEdict(inflictor) || GetClientTeam(attacker) != 3 || IsTank(attacker)) return Plugin_Continue;
-    else if (!GetConVarBool(cvar_allow_witch_scratch))
+    if (!IsValidClient(attacker)) return Plugin_Continue;
+    
+    if (GetClientTeam(attacker) == 3 && !IsTank(attacker))
     {
-        damage = 0.0; 
-        return Plugin_Changed;
+        if (!GetConVarBool(cvar_allow_witch_scratch))
+        {
+            damage = 0.0; 
+            return Plugin_Changed;
+        }
+        return Plugin_Handled;		
     }
-    return Plugin_Handled;
+    return Plugin_Continue;
 }
 
 public WitchHurt_Event(Handle:event, const String:name[], bool:dontBroadcast)
@@ -348,6 +353,14 @@ stock bool:IsIncapped(client)
 {
     if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1)) return true;
     return false;
+}
+
+bool:IsValidClient(client)
+{
+    if (client <= 0 || client > MaxClients) return false;
+    if (!IsClientInGame(client)) return false;
+    if (IsClientSourceTV(client) || IsClientReplay(client)) return false;
+    return true;
 }
 
 public SortByDamageDesc(elem1, elem2, const array[], Handle:hndl)
