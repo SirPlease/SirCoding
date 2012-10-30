@@ -233,8 +233,8 @@ public PlayerDied_Event(Handle:event, const String:name[], bool:dontBroadcast)
 
 public Action:PrintAnyway(Handle:timer)
 {
-    
     CalculateWitch();
+    ClearDamage();
 }
 
 CalculateWitch()
