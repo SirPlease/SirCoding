@@ -63,7 +63,8 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 
 stock bool:IsTank(client)
 {
-    return (IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") == 8);
+    if (GetEntProp(client, Prop_Send, "m_zombieClass") == 8) return true;
+    return false;
 }
 
 bool:IsValidClient(client)
