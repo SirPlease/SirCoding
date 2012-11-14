@@ -32,12 +32,19 @@
 * - Added Fail Cr0wn Notifier. (Only shows when the killer got incapped & did 1000 DMG)
 * - Last Fix for Damage/Percentages; not adding up to 1000/100%.
 * - Changed print format a bit.
+* 
+* Version 1.1c
+* - Pub Ready: Takes T2 Shotguns into Account.
 */
 
 new const TEAM_SURVIVOR = 2;
 static const String:CLASSNAME_WITCH[]  	= "witch";
+
+//Lazy Check instead of using an Array.
 static const String:WEAPON_SHOTGUN1[]    = "weapon_shotgun_chrome";
 static const String:WEAPON_SHOTGUN2[]    = "weapon_pumpshotgun";
+static const String:WEAPON_SHOTGUN3[]    = "weapon_shotgun_spas";
+static const String:WEAPON_SHOTGUN4[]    = "weapon_autoshotgun";
 //static const String:WEAPON_MELEE[] = "weapon_melee";
 
 new bool: bRoundOver;                //Did Round End?
@@ -63,7 +70,7 @@ public Plugin:myinfo =
     name = "Witch Damage Announce",
     author = "Sir",
     description = "Print Witch Damage to chat",
-    version = "1.1b",
+    version = "1.1c",
     url = "https://github.com/SirPlease/SirCoding"
 }
 
@@ -204,7 +211,7 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
             return;
         }
         
-        if (StrEqual(WeaponName, WEAPON_SHOTGUN1, false) || StrEqual(WeaponName, WEAPON_SHOTGUN2, false))
+        if (StrEqual(WeaponName, WEAPON_SHOTGUN1, false) || StrEqual(WeaponName, WEAPON_SHOTGUN2, false) || StrEqual(WeaponName, WEAPON_SHOTGUN3, false) || StrEqual(WeaponName, WEAPON_SHOTGUN4, false))
         {
             // Broken - Fix Later
             //if(RoundToFloor(ShotWitchTotal) > 1) PrintToChatAll("\x01>> \x03%N \x01Draw Cr0wned the \x04Witch \x01<<", killer);
