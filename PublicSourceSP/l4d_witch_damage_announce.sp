@@ -23,29 +23,18 @@
 * - Allows Console Witch Spawns. (Doesn't support Multiple Witches at the same time)
 * 
 * Version 1.1
-* - Added "Crown" Notifier on 1 ShotKill.
 * - Added "Tank-Kill" Notifier when Tank kills Witch.
 * - Added Cvar to enable or disable SI from causing the witch to get startled. (FF to Witch is always blocked)
 * 
 * Version 1.1b
-* - Fixed Cr0wns not always counting as Cr0wns, resulting into a 1000 Damage/100% Print.
-* - Added Fail Cr0wn Notifier. (Only shows when the killer got incapped & did 1000 DMG)
 * - Last Fix for Damage/Percentages; not adding up to 1000/100%.
 * - Changed print format a bit.
 * 
-* Version 1.1c
-* - Pub Ready: Takes T2 Shotguns into Account.
 */
 
 new const TEAM_SURVIVOR = 2;
 static const String:CLASSNAME_WITCH[]  	= "witch";
 
-//Lazy Check instead of using an Array.
-static const String:WEAPON_SHOTGUN1[]    = "weapon_shotgun_chrome";
-static const String:WEAPON_SHOTGUN2[]    = "weapon_pumpshotgun";
-static const String:WEAPON_SHOTGUN3[]    = "weapon_shotgun_spas";
-static const String:WEAPON_SHOTGUN4[]    = "weapon_autoshotgun";
-//static const String:WEAPON_MELEE[] = "weapon_melee";
 
 new bool: bRoundOver;                //Did Round End?
 new bool: bWitchSpawned;             //Did Witch Spawn?
@@ -70,7 +59,7 @@ public Plugin:myinfo =
     name = "Witch Damage Announce",
     author = "Sir",
     description = "Print Witch Damage to chat",
-    version = "1.1c",
+    version = "1.1b",
     url = "https://github.com/SirPlease/SirCoding"
 }
 
@@ -130,9 +119,6 @@ public WitchHurt_Event(Handle:event, const String:name[], bool:dontBroadcast)
         new attackerId = GetEventInt(event, "attacker");
         new attacker = GetClientOfUserId(attackerId);
         new damageDone = GetEventInt(event, "amount");
-        decl String:Weapon[64];
-        new WeaponIndex = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
-        GetEdictClassname(WeaponIndex, Weapon, sizeof(Weapon));
         
         // Just count Survivor Damage
         if (IsClientAndInGame(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR)
@@ -187,39 +173,6 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
     {
         iDamageWitch[killer] += (RoundToFloor(g_fWitchHealth - DamageWitchTotal));
         DamageWitchTotal = RoundToFloor(g_fWitchHealth);
-    }
-    
-    //Check if it was a cr0wn
-    //Using Event Bool (OneShot) doesn't trigger when SI scratches Witch.
-    if (iDamageWitch[killer] == 1000)
-    {
-        if(bHasPrinted) return;
-        
-        bWitchSpawned = false;
-        ClearDamage();
-        
-        new String:WeaponName[64];
-        new WeaponIndex = GetEntPropEnt(killer, Prop_Send, "m_hActiveWeapon");
-        GetEdictClassname(WeaponIndex, WeaponName, sizeof(WeaponName));
-        
-        if(IsIncapped(killer) && !bRoundOver)
-        {
-            bHasPrinted = true;
-            PrintToChatAll("\x01>> \x03%N \x04failed Cr0wn \x01<<", killer);
-            PrintToChatAll("\x011000 [\x04100%%\x01] \x03%N", killer);
-            ClearDamage();
-            return;
-        }
-        
-        if (StrEqual(WeaponName, WEAPON_SHOTGUN1, false) || StrEqual(WeaponName, WEAPON_SHOTGUN2, false) || StrEqual(WeaponName, WEAPON_SHOTGUN3, false) || StrEqual(WeaponName, WEAPON_SHOTGUN4, false))
-        {
-            // Broken - Fix Later
-            //if(RoundToFloor(ShotWitchTotal) > 1) PrintToChatAll("\x01>> \x03%N \x01Draw Cr0wned the \x04Witch \x01<<", killer);
-            PrintToChatAll("\x01>> \x03%N \x01Cr0wned the \x04Witch", killer);
-        }
-        else PrintToChatAll("\x01>> \x03%N \x01Killed the \x03Witch \x04without a Shotgun \x01<<", killer);
-        bHasPrinted = true;
-        return;
     }
     
     if (!bRoundOver)
