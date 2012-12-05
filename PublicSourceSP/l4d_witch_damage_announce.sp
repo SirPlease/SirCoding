@@ -121,6 +121,7 @@ public WitchHurt_Event(Handle:event, const String:name[], bool:dontBroadcast)
         new damageDone = GetEventInt(event, "amount");
         
         // Just count Survivor Damage
+		
         if (IsClientAndInGame(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR)
         {
             DamageWitchTotal += damageDone;
@@ -160,7 +161,7 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
     new killer = GetClientOfUserId(killerId);
     
     //Check if Tank Killed the Witch.
-    if (GetClientTeam(killer) == 3 && IsTank(killer))
+    if (IsValidClient(killer) && GetClientTeam(killer) == 3 && IsTank(killer))
     {
         PrintToChatAll("\x01>> \x04Tank (\x03%N) \x01killed the \x04Witch", killer);
         bWitchSpawned = false;
