@@ -41,7 +41,6 @@ new bool: bWitchSpawned;             //Did Witch Spawn?
 new bool: bHasPrinted;               //Did we Print?
 new iDamageWitch[MAXPLAYERS + 1];    //Damage done to Witch, client tracking.
 new DamageWitchTotal;                //Total Damage done to Witch.
-//new ShotWitchTotal;                  //Shots Fired at Witch.
 //Witch's Standard health
 new Float: g_fWitchHealth            = 1000.0;    
 
@@ -65,7 +64,7 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
-    cvar_allow_witch_scratch=CreateConVar("witch_block_enrage", "0", "Disable SI from forcing the witch to Attack - 0 = Block FF, Allow Enrage");
+    cvar_allow_witch_scratch=CreateConVar("witch_block_enrage", "0", "Disable SI from forcing the witch to Attack - 0 = Allow Enrage");
     
     //In case Witch survives.
     HookEvent("player_death", PlayerDied_Event, EventHookMode_Post);
@@ -121,11 +120,10 @@ public WitchHurt_Event(Handle:event, const String:name[], bool:dontBroadcast)
         new damageDone = GetEventInt(event, "amount");
         
         // Just count Survivor Damage
-		
-        if (IsClientAndInGame(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR)
+        
+        if (IsValidClient(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR)
         {
             DamageWitchTotal += damageDone;
-            //ShotWitchTotal++;
             
             //If Damage is higher than Max Health, Adjust.
             if (DamageWitchTotal > g_fWitchHealth) iDamageWitch[attacker] += (damageDone - (DamageWitchTotal - RoundToFloor(g_fWitchHealth)));
@@ -310,12 +308,6 @@ stock bool:IsTank(client)
     return false;
 }
 
-stock bool:IsIncapped(client)
-{
-    if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1)) return true;
-    return false;
-}
-
 bool:IsValidClient(client)
 {
     if (client <= 0 || client > MaxClients) return false;
@@ -338,7 +330,6 @@ ClearDamage()
 {
     new i, maxplayers = MaxClients;
     for (i = 1; i <= maxplayers; i++) iDamageWitch[i] = 0;
-    //ShotWitchTotal = 0;
     DamageWitchTotal = 0;
 }
 
