@@ -2,6 +2,7 @@
 
 #include <sourcemod>
 #include <l4d2lib>
+#include <l4d2util_tanks>
 #include <sdktools>
 
 /******************
@@ -17,7 +18,6 @@
 ******************/
 
 //Checking & Saving Entities
-new Safe;
 new Surv;
 new Door1;
 new Door2;
@@ -85,7 +85,6 @@ public Action:Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
     //Empty Storage
     Door1 = -1;
     Door2 = -1;
-    Safe = -1;
     Surv = -1;
     SurvivorStart[0] = 0.0;
     First[0] = 0.0;
@@ -109,10 +108,15 @@ public Action:CheckEnd(Handle:timer)
 {
     if (!GetConVarBool(g_hSafeEndClose)) return;
     
-    //Checks distance between found "End Saferoom" Doors and takes furthest.
-    if (GetVectorDistance(First, SurvivorStart) > GetVectorDistance(Second, SurvivorStart)) AcceptEntityInput(Door1, "Close");
-    else AcceptEntityInput(Door2, "Close");   
+    if (DoorsFound > 1)
+    {
+        //Checks distance between found "End Saferoom" Doors and takes furthest.
+        if (GetVectorDistance(First, SurvivorStart) > GetVectorDistance(Second, SurvivorStart)) AcceptEntityInput(Door1, "Close");
+        else AcceptEntityInput(Door2, "Close");  
+    }
+    else AcceptEntityInput(Door1, "Close"); 
 }
+
 FindStart()
 {
     new Float:Location[3]
@@ -127,6 +131,7 @@ FindStart()
 
 FindDoors()
 {
+    new Safe = -1;
     while((Safe = Sub_FindEntityByClassname(Safe, "prop_door_rotating_checkpoint")) != -1)
     {
         //Only Affects end Saferoom
@@ -243,7 +248,7 @@ public Action:OnIncap(Handle:event, const String:name[], bool:dontBroadcast)
 }
 
 //Doesn't trigger if Tank turns AI and gets kicked.
-public L4D2_OnTankDeath(tankClient)
+public L4D2_OnTankDeath()
 {
     if (GetConVarBool(g_hSafeEndTankBlock)) CanWeClose();
 }
@@ -283,7 +288,7 @@ bool:TankUp()
     for (new t = 1; t <= MaxClients; t++)
     {
         if (!IsClientInGame(t) 
-        || GetClientTeam(t) != 3 
+            || GetClientTeam(t) != 3 
         || !IsPlayerAlive(t) 
         || GetEntProp(t, Prop_Send, "m_zombieClass") != 8)
         continue;
@@ -300,7 +305,7 @@ FindSurvivors()
     for (new outsider = 1; outsider <= MaxClients; outsider++)
     {
         if (IsValidClient(outsider) 
-        && GetClientTeam(outsider) == 2
+            && GetClientTeam(outsider) == 2
         && !checkpointreached[outsider]  
         && IsPlayerAlive(outsider) 
         && !IsIncapped[outsider]) 
