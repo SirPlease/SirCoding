@@ -5,30 +5,22 @@
 #include <l4d2util_tanks>
 #include <sdktools>
 
-/******************
-///////////////////
-////////Version 1.0
-* 
+/*
+* Version 1.0
 * - End Saferoom Door closes shut to prevent SI from Sneaking in there.
 * - While Tank is up the End Saferoom Door can't be closed unless 50% of the Team is Dead/Incapped.
 * > In 1v1 and 2v2 you're forced to kill the Tank.
 * 
-* 
+* Version 1.1
+* - Implement a new method to hook onto End Saferoom Doors.
+* - Now works in Custom Campaigns and L4D1 Maps.
+* - Cleaned up Code.
 ///////////////////
 ******************/
 
 //Checking & Saving Entities
-new Surv;
-new Door1;
-new Door2;
-new DoorsFound;
-
-//Save Entity Vectors
-new Float:First[3]
-new Float:Second[3]
-
-//Survivor Spawn
-new Float:SurvivorStart[3]
+new Door;
+new TotalDoors;
 
 //Has survivor made it to the saferoom? / How many made it to the saferoom?
 new checkpointreached[MAXPLAYERS];
@@ -39,14 +31,21 @@ new Handle:g_hSafeEndClose = INVALID_HANDLE;
 new Handle:g_hSafeEndTankBlock = INVALID_HANDLE;
 
 new Handle:g_hSurvivorLimit = INVALID_HANDLE;
-new IsIncapped[MAXPLAYERS];
+new IsIncapped[MAXPLAYERS+1];
+
+new bool:bHasHooked;
+
+//No Finals Please
+new Handle:hFinalMapsTrie;
+new bool:bCheckFinal;
+
 
 public Plugin:myinfo = 
 {
     name = "Saferoom Door Manager",
     author = "Sir",
     description = "Manages Saferoom Doors",
-    version = "1.0",
+    version = "1.1",
     url = "https://github.com/SirPlease/SirCoding"
 }
 
@@ -56,25 +55,20 @@ public OnPluginStart()
     g_hSafeEndClose = CreateConVar("safe_end_lock", "1", "Close end Saferoom Door on round start?");
     g_hSafeEndTankBlock = CreateConVar("safe_end_tank", "1", "Stop Survivors from closing saferoom during Tank when 50% or more is Alive");
     
+    //Finals
+    hFinalMapsTrie = FinalMaps();
+    
     //Tracking
     g_hSurvivorLimit = FindConVar("survivor_limit");
     
-    //Saferoom Leaving and Entering
-    HookEvent("player_entered_checkpoint", Player_Entered_Checkpoint);
-    HookEvent("player_left_checkpoint", Player_Left_Checkpoint);
-    
-    //Setup the Doors
+    //Start!
+    bHasHooked = false;
     HookEvent("round_start", Round_Start);
-    
-    //Incap or Death - Check Door.
-    HookEvent("revive_success", OnRevive); 
-    HookEvent("player_death", OnDeath);
-    HookEvent("player_incapacitated", OnIncap);
 }
 
 public Action:Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
 {
-    //Reset Clientside Cvars and Total.
+    //Reset Clientside Tracking and Total.
     for(new i=1;i<=MaxClients;i++)
     {
         checkpointreached[i] = 0;
@@ -83,94 +77,72 @@ public Action:Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
     checkpointtotal = 0;
     
     //Empty Storage
-    Door1 = -1;
-    Door2 = -1;
-    Surv = -1;
-    SurvivorStart[0] = 0.0;
-    First[0] = 0.0;
-    Second[0] = 0.0;
-    DoorsFound = 0;
+    Door = 0;
+    TotalDoors = 0;
+    bCheckFinal = false;
     
-    //Start Checking the Map
-    CreateTimer(1.2, CheckMap); 
+    //Map Check
+    new String:sCurMap[64];
+    GetCurrentMap(sCurMap, sizeof(sCurMap));
+    GetTrieValue(hFinalMapsTrie, sCurMap, bCheckFinal);
 }
 
-public Action:CheckMap(Handle:timer)
+public OnEntityCreated(entity, const String:classname[]) 
 {
-    //Find Survivor Spawn
-    FindStart();
-    
-    //Saferoom Doors
-    FindDoors();
-}
-
-public Action:CheckEnd(Handle:timer)
-{
-    if (!GetConVarBool(g_hSafeEndClose)) return;
-    
-    if (DoorsFound > 1)
+    if(StrEqual(classname, "prop_door_rotating_checkpoint")) //Saferoom Door
     {
-        //Checks distance between found "End Saferoom" Doors and takes furthest.
-        if (GetVectorDistance(First, SurvivorStart) > GetVectorDistance(Second, SurvivorStart)) AcceptEntityInput(Door1, "Close");
-        else AcceptEntityInput(Door2, "Close");  
-    }
-    else AcceptEntityInput(Door1, "Close"); 
-}
-
-FindStart()
-{
-    new Float:Location[3]
-    while((Surv = Sub_FindEntityByClassname(Surv, "info_survivor_position")) != -1)
-    {
-        {
-            GetEntPropVector(Surv, Prop_Send, "m_vecOrigin", Location)
-            SurvivorStart = Location;
-        }
+        CreateTimer(1.0, DelayDoor, entity);
     }
 }
 
-FindDoors()
+public Action:DelayDoor(Handle:timer, any:entity)
 {
-    new Safe = -1;
-    while((Safe = Sub_FindEntityByClassname(Safe, "prop_door_rotating_checkpoint")) != -1)
+    //Check both Model and Targetname
+    decl String:sModel[128];
+    decl String:sName[128];
+    GetEntPropString(entity, Prop_Data, "m_ModelName", sModel, sizeof(sModel));
+    GetEntPropString(entity, Prop_Data, "m_iName", sName, sizeof(sName));
+    
+    if (StrEqual(sModel, "models/props_doors/checkpoint_door_02.mdl")
+    || StrEqual(sModel, "models/props_doors/checkpoint_door_-02.mdl"))
     {
-        //Only Affects end Saferoom
-        decl String:sModel[128];
-        GetEntPropString(Safe, Prop_Data, "m_ModelName", sModel, sizeof(sModel));
+        //Store Doors for Recheck - Used for maps that don't trigger on the targetname check
+        TotalDoors++;
         
-        if (StrEqual(sModel, "models/props_doors/checkpoint_door_02.mdl")
-        || StrEqual(sModel, "models/props_doors/checkpoint_door_-02.mdl"))
+        //Is targetname equal to these? - Triggers for most maps.
+        if(StrEqual(sName, "checkpoint_entrance")
+        || StrEqual(sName, "door_checkpoint"))
         {
-            //Store Entities
-            DoorsFound++
-            
-            //If multiple entities have the "End Saferoom" Model seperate them and check them later.
-            if (DoorsFound == 1)
-            {
-                Door1 = Safe;
-                GetEntPropVector(Safe, Prop_Send, "m_vecOrigin", First)
-                
-                //Check Timer
-                CreateTimer(2.0, CheckEnd);
-            }
-            else 
-            {
-                Door2 = Safe;
-                GetEntPropVector(Safe, Prop_Send, "m_vecOrigin", Second)
-            }	
+            Door = entity;
+            FoundYou();
         }
+        // Found an End Saferoom door Model that's not assigned the correct targetname.
+        else CreateTimer (1.0, NoDoors, entity);
     }
 }
 
-public Sub_FindEntityByClassname(StartEntity, const String:ClassName[])
+public Action:NoDoors(Handle:timer, any:entity)
 {
-    while (StartEntity > -1 && !IsValidEntity(StartEntity))
+    //There should only be one End Saferoom Model, check for it.
+    if(TotalDoors == 1 && Door == 0)
     {
-        StartEntity--;
+        Door = entity;
+        FoundYou();
     }
+}
+
+FoundYou()
+{
+    //If map is a finale, return.
+    if(bCheckFinal) return;
     
-    return FindEntityByClassname(StartEntity, ClassName);
-}  
+    //Close door if requested
+    if (GetConVarBool(g_hSafeEndClose)) AcceptEntityInput(Door, "Close");
+    
+    //Hook/UnHook
+    if(GetConVarBool(g_hSafeEndTankBlock)) Hook();
+    else UnHook();
+}
 
 public Action:Player_Entered_Checkpoint(Handle:event, const String:name[], bool:dontBroadcast)
 {
@@ -181,7 +153,7 @@ public Action:Player_Entered_Checkpoint(Handle:event, const String:name[], bool:
     {
         //Is Actual End Saferoom?
         //Check if there are multiple "End Saferoom" Doors.
-        if ((DoorsFound == 1 && Door1 == door)  || Door2 == door)
+        if (door == Door)
         {
             //Survivor Entered
             if (GetClientTeam(entered) == 2) 
@@ -189,8 +161,8 @@ public Action:Player_Entered_Checkpoint(Handle:event, const String:name[], bool:
                 checkpointreached[entered] = 1;
                 checkpointtotal++;
                 
-                //Check
-                if (GetConVarBool(g_hSafeEndTankBlock)) CanWeClose();
+                //Check if we can Close.
+                CanWeClose();
             }	
         }
     }
@@ -206,36 +178,39 @@ public Action:Player_Left_Checkpoint(Handle:event, const String:name[], bool:don
         checkpointreached[left] = 0;
         checkpointtotal--;
         
-        //Check
-        if (GetConVarBool(g_hSafeEndTankBlock) && checkpointtotal > 0) CanWeClose();
+        //Check if we can Close.
+        if (checkpointtotal > 0) CanWeClose();
     }
 }
 
 public Action:OnRevive(Handle:event, const String:name[], bool:dontBroadcast)
 {
     new revive = GetClientOfUserId(GetEventInt(event,"subject"));
-    if (!IsValidClient(revive) || GetClientTeam(revive ) != 2) return
+    if (!IsValidClient(revive) || GetClientTeam(revive ) != 2) return;
     
     //Incapped, do a check.
     IsIncapped[revive] = 0;
     
-    if (GetConVarBool(g_hSafeEndTankBlock) && checkpointtotal > 0) CanWeClose();
+    if (checkpointtotal > 0) CanWeClose();
 }
 
 public Action:OnDeath(Handle:event, const String:name[], bool:dontBroadcast)
 {
     new death = GetClientOfUserId(GetEventInt(event,"userid"));
-    if (!IsValidClient(death) || GetClientTeam(death) != 2) return;
+    decl String:victim[64];
+    GetEventString(event, "victimname", victim, sizeof(victim))
     
-    //You're dead, you didn't make it.
-    if (checkpointreached[death] == 1)
+    if (!IsValidClient(death)) return;
+    
+    //Survivor Died.
+    if(GetClientTeam(death) != 2 && checkpointreached[death] == 1)
     {
         checkpointreached[death] = 0;
         checkpointtotal--;
+        
+        if (checkpointtotal > 0) CanWeClose();
     }
-    
-    //Need a recheck
-    if (GetConVarBool(g_hSafeEndTankBlock) && checkpointtotal > 0) CanWeClose();
+    else if (StrEqual(victim, "tank", false)) CanWeClose();
 }
 
 public Action:OnIncap(Handle:event, const String:name[], bool:dontBroadcast)
@@ -245,26 +220,14 @@ public Action:OnIncap(Handle:event, const String:name[], bool:dontBroadcast)
     
     //Incapped, do a check.
     IsIncapped[incap] = 1;
-}
-
-//Doesn't trigger if Tank turns AI and gets kicked.
-public L4D2_OnTankDeath()
-{
-    if (GetConVarBool(g_hSafeEndTankBlock)) CanWeClose();
+    
+    if (checkpointtotal > 0) CanWeClose();
 }
 
 CanWeClose()
 {
-    if(!CheckClose())
-    {
-        if (DoorsFound > 1) DispatchKeyValue(Door2, "spawnflags", "32768");
-        else DispatchKeyValue(Door1, "spawnflags", "32768");
-    }
-    else
-    {
-        if (DoorsFound > 1)DispatchKeyValue(Door2, "spawnflags", "8192");
-        else DispatchKeyValue(Door1, "spawnflags", "8192");
-    }
+    if(!CheckClose()) DispatchKeyValue(Door, "spawnflags", "32768");
+    else DispatchKeyValue(Door, "spawnflags", "8192");
 }
 
 bool:CheckClose()
@@ -313,6 +276,59 @@ FindSurvivors()
         Outsiders++;
     }
     return Outsiders;
+}
+
+Hook()
+{
+    //Hooked Events Already.
+    if (bHasHooked) return;
+    bHasHooked = true;
+    
+    //Saferoom Leaving and Entering
+    HookEvent("player_entered_checkpoint", Player_Entered_Checkpoint);
+    HookEvent("player_left_checkpoint", Player_Left_Checkpoint);
+    
+    //Incap or Death - Check Door.
+    HookEvent("revive_success", OnRevive); 
+    HookEvent("player_death", OnDeath);
+    HookEvent("player_incapacitated", OnIncap);
+}
+
+UnHook()
+{
+    //No Events to Unhook
+    if(!bHasHooked) return;
+    bHasHooked = false;
+    
+    //Saferoom Leaving and Entering
+    UnhookEvent("player_entered_checkpoint", Player_Entered_Checkpoint);
+    UnhookEvent("player_left_checkpoint", Player_Left_Checkpoint);
+    
+    //Incap or Death - Check Door.
+    UnhookEvent("revive_success", OnRevive); 
+    UnhookEvent("player_death", OnDeath);
+    UnhookEvent("player_incapacitated", OnIncap);
+}
+
+Handle:FinalMaps()
+{
+    new Handle: trie = CreateTrie();
+    
+    SetTrieValue(trie, "c1m4_atrium", true);
+    SetTrieValue(trie, "c2m5_concert", true);
+    SetTrieValue(trie, "c3m4_plantation", true);
+    SetTrieValue(trie, "c4m5_milltown_escape", true);
+    SetTrieValue(trie, "c5m5_bridge", true);
+    SetTrieValue(trie, "c6m3_port", true);
+    SetTrieValue(trie, "c7m3_port", true);
+    SetTrieValue(trie, "c8m5_rooftop", true);
+    SetTrieValue(trie, "c9m2_lots", true);
+    SetTrieValue(trie, "c10m5_houseboat", true);
+    SetTrieValue(trie, "c11m5_runway", true);
+    SetTrieValue(trie, "c12m5_cornfield", true);
+    SetTrieValue(trie, "c13m4_cutthroatcreek", true);
+    
+    return trie;    
 }
 
 bool:IsValidClient(client)
