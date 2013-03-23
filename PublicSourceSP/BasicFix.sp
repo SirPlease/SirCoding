@@ -17,15 +17,6 @@ new bool: bHandled = false;
 new Handle: hTimer = INVALID_HANDLE;
 new Handle: g_hReady = INVALID_HANDLE;
 
-// - Ping Fix
-new Handle:g_hCvarMode = INVALID_HANDLE;
-new Handle:g_hCvarEnabled = INVALID_HANDLE;
-
-new bool:g_bEnabled;
-new g_iMode = 2;
-
-new g_iPingOffset;
-
 //<<<<<<<<<<<<<<<<<<<<< TICKRATE FIXES >>>>>>>>>>>>>>>>>>
 //// ------- Slow Doors ----------
 // **************************** 
@@ -113,7 +104,7 @@ new Handle: g_hCvarGravity       = INVALID_HANDLE;
 * 
 * Version 1.3
 * - Implemented a fix for an issue that causes SI to survive a melee attack (ZC 1-5)
-* - Ping in scoreboard will be correct right away, rather than a high ping at first due to rate calculation.
+*
 * */
 
 public Plugin:myinfo = 
@@ -134,14 +125,6 @@ public OnPluginStart()
     //Server CVar
     HookEvent("server_cvar", Event_ServerCvar, EventHookMode_Pre);
     HookEvent("player_hurt", Event_Hurt);
-    
-    g_iPingOffset = FindSendPropInfo("CPlayerResource", "m_iPing");
-    
-    g_hCvarEnabled = CreateConVar("sm_trealping_enable", "1", "Enable tRealPing", FCVAR_PLUGIN, true, 0.0, true, 1.0);
-    g_hCvarMode = CreateConVar("sm_trealping_mode", "2", "0: GetClientLatency, 1: GetClientAvgLatency, 2: Netgraph, 3: Scoreboard;", FCVAR_PLUGIN, true, 0.0, true, 3.0);
-    
-    HookConVarChange(g_hCvarEnabled, Cvar_Changed);
-    HookConVarChange(g_hCvarMode, Cvar_Changed);
     
     //Is Server 60+ Tick?
     tickInterval = GetTickInterval();
@@ -200,24 +183,6 @@ public OnClientDisconnect(client)
     SDKUnhook(client, SDKHook_PreThink, Hook_OnPostThinkPost);
 }
 
-public OnMapStart() 
-{
-    new iPlayerManager = -1;
-    
-    for(new iEntity = MaxClients+1; iEntity < GetMaxEntities(); iEntity++) {
-        if(Entity_ClassNameMatches(iEntity, "_player_manager", true)) {
-            iPlayerManager = iEntity;
-            break;
-        }
-    }
-    
-    if(iPlayerManager == -1) {
-        SetFailState("Unable to find \"*_player_manager\" entity");
-    }
-    
-    SDKHook(iPlayerManager, SDKHook_ThinkPost, PlayerManager_OnThinkPost);
-}
-
 public OnConfigsExecuted()
 {
     if(tickRRate >= 40)
@@ -230,63 +195,11 @@ public OnConfigsExecuted()
         HookConVarChange(g_cvarDoors_Speed,				ConVarChange_Doors_Speed);
         HookConVarChange(g_cvarDoors_Speed_Prop,		ConVarChange_Doors_Speed_Prop);
     }
-    
-    g_bEnabled = GetConVarBool(g_hCvarEnabled);
-    g_iMode = GetConVarInt(g_hCvarMode);
-}
-
-public PlayerManager_OnThinkPost(iEnt) 
-{
-    if(!g_bEnabled)return;
-    
-    new iPing[MAXPLAYERS+1];
-    GetEntDataArray(iEnt, g_iPingOffset, iPing, MaxClients+1);
-    
-    for (new iClient = 1; iClient <= MaxClients; iClient++)	{
-        if(IsClientInGame(iClient) && !IsFakeClient(iClient)) {
-            switch(g_iMode)
-            {
-                case 0: {
-                    new Float:fLatency = GetClientLatency(iClient, NetFlow_Both);
-                    if(fLatency == -1)continue;						// Network info not available, e.g. a bot
-                    
-                    iPing[iClient] = RoundToNearest(fLatency * 500);
-                }
-                
-                case 1: {
-                    new Float:fLatency = GetClientAvgLatency(iClient, NetFlow_Both);
-                    if(fLatency == -1)continue;						// Network info not available, e.g. a bot
-                    
-                    iPing[iClient] = RoundToNearest(fLatency * 500);
-                }
-                
-                case 2: {
-                    new iFakePing = Client_GetFakePing(iClient, false) - 10;
-                    if(iFakePing == 0) continue;						// Network info not available, e.g. a bot
-                    if(iFakePing < 0) iFakePing = 5;
-                    iPing[iClient] = iFakePing;
-                }
-                
-                case 3: {
-                    new iFakePing = Client_GetFakePing(iClient, true);
-                    if(iFakePing == 0)continue;						// Network info not available, e.g. a bot
-                    iPing[iClient] = iFakePing;
-                }
-            }
-        }
-    }
-    
-    SetEntDataArray(iEnt, g_iPingOffset, iPing, MaxClients+1);
 }
 
 public Cvar_PistolDelay(Handle:convar, const String:oldValue[], const String:newValue[])
 {
     UpdatePistolDelays();
-}
-
-public Cvar_Changed(Handle:convar, const String:oldValue[], const String:newValue[]) 
-{
-    OnConfigsExecuted();
 }
 
 public ConVarChange_Enable(Handle:cvar, const String:szOldVal[], const String:szNewVal[]){
