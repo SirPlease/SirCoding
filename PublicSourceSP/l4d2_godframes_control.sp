@@ -24,6 +24,7 @@ new Handle:	hSmoker 				= INVALID_HANDLE;
 new Handle:	hJockey 				= INVALID_HANDLE;
 new Handle:	hCharger 				= INVALID_HANDLE;
 new Handle: hSpitFlags				= INVALID_HANDLE;
+new Handle: hFFFlags				= INVALID_HANDLE;
 new Handle: hCommonFlags			= INVALID_HANDLE;
 new Handle: hFF                     = INVALID_HANDLE;
 
@@ -73,6 +74,9 @@ public OnPluginStart()
     FCVAR_PLUGIN, true, 0.0, true, 3.0 );
     hSpitFlags  = CreateConVar( "gfc_spit_zc_flags",     "0",
     "Which classes will be affected by extra spit protection time. 1 - Hunter. 2 - Smoker. 4 - Jockey. 8 - Charger.",
+    FCVAR_PLUGIN, true,  0.0, true, 15.0 );
+    hFFFlags  = CreateConVar( "gfc_ff_flags",     "0",
+    "Which classes will be affected by extra FF protection time. 1 - Hunter. 2 - Smoker. 4 - Jockey. 8 - Charger.",
     FCVAR_PLUGIN, true,  0.0, true, 15.0 );
     hCommonFlags= CreateConVar( "gfc_common_zc_flags",     "0",
     "Which classes will be affected by extra common protection time. 1 - Hunter. 2 - Smoker. 4 - Jockey. 8 - Charger.",
@@ -155,9 +159,9 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
     {
         fTimeLeft += GetConVarFloat(hSpit);
     }
-    else if (GetClientTeam(attacker) == 2 && iLastSI[victim])
+    else if (GetClientTeam(attacker) == 2 && (iLastSI[victim] & GetConVarInt(hFFFlags))) //friendly-fire
     {
-        fTimeLeft += GetConVarFloat(hFF); //friendly-fire
+        fTimeLeft += GetConVarFloat(hFF);
     }
     
     if (fTimeLeft > 0.0)	//means fake god frames are in effect
