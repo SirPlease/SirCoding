@@ -40,6 +40,13 @@ public Plugin:myinfo =
     description = "Allows for control of what gets godframed and what doesnt."
 };
 
+/*
+* Slight edit by Sir;
+* 
+* - Added control for Friendly-Fire Godframes. (By default it's on and only covers Jockied/Pulled Survivors)
+* - Added control for Tank-override on Godframes.
+*/
+
 public OnPluginStart()
 {
     hHittable	= CreateConVar( "gfc_hittable_override",	"1",
@@ -48,13 +55,13 @@ public OnPluginStart()
     hWitch		= CreateConVar( "gfc_witch_override", 		"1",
     "Allow witches to always ignore godframes.",
     FCVAR_PLUGIN, true,	0.0, true, 1.0 );
-    hTank		= CreateConVar( "gfc_tank_override", 		"1",
+    hTank		= CreateConVar( "gfc_tank_override", 		"0",
     "Allow tanks to always ignore godframes.",
     FCVAR_PLUGIN, true,	0.0, true, 1.0 );
     hSpit		= CreateConVar( "gfc_spit_extra_time", 		"0.0",
     "Additional godframe time before spit damage is allowed.",
     FCVAR_PLUGIN, true,	0.0, true, 3.0 );
-    hFF		    = CreateConVar( "gfc_ff_time", 		"0.0",
+    hFF		    = CreateConVar( "gfc_ff_time", 		"0.8",
     "Additional godframe time before friendly fire damage is allowed.",
     FCVAR_PLUGIN, true,	0.0, true, 3.0 );
     hCommon		= CreateConVar( "gfc_common_extra_time", 	"0.0",
@@ -75,10 +82,10 @@ public OnPluginStart()
     hSpitFlags  = CreateConVar( "gfc_spit_zc_flags",     "0",
     "Which classes will be affected by extra spit protection time. 1 - Hunter. 2 - Smoker. 4 - Jockey. 8 - Charger.",
     FCVAR_PLUGIN, true,  0.0, true, 15.0 );
-    hFFFlags  = CreateConVar( "gfc_ff_flags",     "0",
+    hFFFlags  = CreateConVar( "gfc_ff_flags",     "6",
     "Which classes will be affected by extra FF protection time. 1 - Hunter. 2 - Smoker. 4 - Jockey. 8 - Charger.",
     FCVAR_PLUGIN, true,  0.0, true, 15.0 );
-    hCommonFlags= CreateConVar( "gfc_common_zc_flags",     "0",
+    hCommonFlags= CreateConVar( "gfc_common_zc_flags",     "6",
     "Which classes will be affected by extra common protection time. 1 - Hunter. 2 - Smoker. 4 - Jockey. 8 - Charger.",
     FCVAR_PLUGIN, true,  0.0, true, 15.0 );
     
@@ -176,7 +183,7 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
             if (GetConVarBool(hWitch)) 		{ return Plugin_Continue; }
         }
         
-        if (StrContains(sClassname, "tank") != -1)		//tanks
+        if (IsTank(attacker))		//tanks
         {
             if (GetConVarBool(hTank)) 		{ return Plugin_Continue; }
         }
@@ -195,5 +202,11 @@ stock IsClientAndInGame(client)
     {
         return IsClientInGame(client);
     }
+    return false;
+}
+
+stock bool:IsTank(client)
+{
+    if (IsClientAndInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") == 8) return true;
     return false;
 }
