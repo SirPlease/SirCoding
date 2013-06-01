@@ -41,6 +41,7 @@ new bool: bWitchSpawned;             //Did Witch Spawn?
 new bool: bHasPrinted;               //Did we Print?
 new iDamageWitch[MAXPLAYERS + 1];    //Damage done to Witch, client tracking.
 new DamageWitchTotal;                //Total Damage done to Witch.
+
 //Witch's Standard health
 new Float: g_fWitchHealth            = 1000.0;    
 
@@ -52,6 +53,7 @@ new g_iSurvivorLimit = 4;
 
 //Handles Cvars
 new Handle:cvar_allow_witch_scratch;
+new Handle:cvar_witch_true_damage;
 
 public Plugin:myinfo = 
 {
@@ -65,6 +67,7 @@ public Plugin:myinfo =
 public OnPluginStart()
 {
     cvar_allow_witch_scratch=CreateConVar("witch_block_enrage", "0", "Disable SI from forcing the witch to Attack - 0 = Allow Enrage");
+    cvar_witch_true_damage=CreateConVar("witch_show_true_damage", "0", "Show damage output rather than actual damage the witch receives? - 0 = Health Damage");
     
     //In case Witch survives.
     HookEvent("player_death", PlayerDied_Event, EventHookMode_Post);
@@ -126,7 +129,7 @@ public WitchHurt_Event(Handle:event, const String:name[], bool:dontBroadcast)
             DamageWitchTotal += damageDone;
             
             //If Damage is higher than Max Health, Adjust.
-            if (DamageWitchTotal > g_fWitchHealth) iDamageWitch[attacker] += (damageDone - (DamageWitchTotal - RoundToFloor(g_fWitchHealth)));
+            if (!GetConVarBool(cvar_witch_true_damage) && DamageWitchTotal > g_fWitchHealth) iDamageWitch[attacker] += (damageDone - (DamageWitchTotal - RoundToFloor(g_fWitchHealth)));
             else iDamageWitch[attacker] += damageDone;	
         }
     }
@@ -148,7 +151,9 @@ public RoundEnd_Event(Handle:event, const String:name[], bool:dontBroadcast)
     if (bWitchSpawned)
     {
         bRoundOver = true;
-        CalculateWitch();
+        
+        if(DamageWitchTotal > 0) CalculateWitch();
+        
         bWitchSpawned = false;
     }
 }
