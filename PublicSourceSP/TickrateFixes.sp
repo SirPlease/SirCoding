@@ -61,23 +61,19 @@ public OnPluginStart()
         g_hCvarGravity = FindConVar("sv_gravity");
         if (GetConVarInt(g_hCvarGravity) != 750) SetConVarInt(g_hCvarGravity, 750);
     }
+	//We don't need you on this 30T Server
+	else ServerCommand("sm plugins unload TickrateFixes.smx");
 }
 
 public OnClientPutInServer(client)
 {
-    if(tickRRate >= 40)
-    {
-        SDKHook(client, SDKHook_PreThink, Hook_OnPostThinkPost);
-        g_fNextAttack[client] = 0.0;
-    }
+    SDKHook(client, SDKHook_PreThink, Hook_OnPostThinkPost);
+    g_fNextAttack[client] = 0.0;
 }
 
 public OnClientDisconnect(client)
 {
-	if(tickRRate >= 40)
-    {
-		SDKUnhook(client, SDKHook_PreThink, Hook_OnPostThinkPost);
-	}
+	SDKUnhook(client, SDKHook_PreThink, Hook_OnPostThinkPost);
 }
 
 public Cvar_PistolDelay(Handle:convar, const String:oldValue[], const String:newValue[])
