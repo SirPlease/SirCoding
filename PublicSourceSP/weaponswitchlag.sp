@@ -16,13 +16,14 @@ new iSwitchlagLerp;
 
 new bool:iLag[MAXPLAYERS+1];
 new Handle:iSpam[MAXPLAYERS+1];
+new Handle:WelcomeTimers[MAXPLAYERS+1];
 
 public Plugin:myinfo = 
 {
     name = "Weapon Switch Lag Fix",
     author = "Visor, Sir",
     description = "Fixes the freeze issue caused on clients by switching weapons.",
-    version = "1.0.1",
+    version = "1.0.2",
     url = "<- URL ->"
 }
 
@@ -33,7 +34,7 @@ public OnPluginStart()
     tickInterval = GetTickInterval();
     if(0.0 < tickInterval) tickRate = 1.0/tickInterval;
     
-    hCvarSwitchlagUpdrate = CreateConVar("rm_switchlag_updrate", "30", "cl_updaterate to set to a client on weapon switch(-1:off)", FCVAR_PLUGIN);
+    hCvarSwitchlagUpdrate = CreateConVar("rm_switchlag_updrate", "20", "cl_updaterate to set to a client on weapon switch(-1:off)", FCVAR_PLUGIN);
     hCvarSwitchlagLerp = CreateConVar("rm_switchlag_interp", "0", "cl_interp_ratio set to 0 to prevent interp setting change", FCVAR_PLUGIN);
     
     iSwitchlagUpdrate = GetConVarInt(hCvarSwitchlagUpdrate);
@@ -47,6 +48,7 @@ public OnPluginStart()
 
     RegConsoleCmd("sm_lag", Lag_Cmd, "Help, I lag during weapon switch!");
 }
+
 
 public Action:Lag_Cmd(client, args)
 {
@@ -68,9 +70,17 @@ public Action:Lag_Cmd(client, args)
     return Plugin_Handled;
 }
 
-public OnClientDisconnect(client)
+public OnClientPutInServer(client)
 {
-    if (iLag[client]) SDKUnhook(client, SDKHook_WeaponSwitch, OnWeaponSwitch);
+    if (!iLag[client]) WelcomeTimers[client] = CreateTimer(1.0, WelcomePlayer, client);
+    else (SDKHook(client, SDKHook_WeaponSwitch, OnWeaponSwitch));
+}
+
+public Action:WelcomePlayer(Handle:timer, any:client)
+{
+    CPrintToChat(client, "{blue}[{default}SirPlease{blue}]{default}: Wish to play with optimal rates?");
+    CPrintToChat(client, "{blue}[{default}SirPlease{blue}]{default}: Have lag/freezes during weapon switch on 100 Tick? Type {blue}!lag");
+    CPrintToChat(client, "{blue}[{default}SirPlease{blue}]{default}: Still have lag afterwards? Type {blue}!lag {default}again. :)");
 }
 
 public Action:OnWeaponSwitch(client, weapon)
