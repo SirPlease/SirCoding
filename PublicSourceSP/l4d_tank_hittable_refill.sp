@@ -55,13 +55,9 @@ public PlayerIncap(Handle:event, String:name[], bool:dontBroadcast)
 
 bool:IsLegitClient(client) 
 {
-    if (IsClientConnected(client)
-    && IsClientInGame(client))
-    {
-        return true;
-    }
-    
-    return false;
+	if (client <= 0 || client > MaxClients) return false;
+	if (!IsClientInGame(client)) return false;
+	return true;
 }
 
 bool:CheckForTank(Attacker, Victim)
