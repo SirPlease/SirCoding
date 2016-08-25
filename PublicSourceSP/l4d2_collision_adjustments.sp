@@ -25,7 +25,8 @@ public Plugin:myinfo =
 	name = "L4D2 Collision Adjustments",
 	author = "Sir",
 	version = "1.0",
-	description = "Takes care of Tank Rocks getting stuck on Common Infected"
+	description = "Takes care of Tank Rocks getting stuck on Common Infected",
+	url = "https://github.com/SirPlease/SirCoding"
 };
 
 public OnPluginStart()
